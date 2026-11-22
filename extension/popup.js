@@ -3,6 +3,7 @@ const statusText = document.querySelector('#status-text');
 const banner = document.querySelector('#banner');
 const handoffBtn = document.querySelector('#handoff-btn');
 const handoffLabel = document.querySelector('#handoff-label');
+const handoffKbd = document.querySelector('#handoff-kbd');
 const tabsHeading = document.querySelector('#tabs-heading');
 const tabsList = document.querySelector('#tabs');
 const emptyState = document.querySelector('#empty-state');
@@ -201,11 +202,17 @@ saveSettingsBtn.addEventListener('click', async () => {
 });
 
 async function init() {
-  const [saved, [tab], status] = await Promise.all([
+  const [saved, [tab], status, commands] = await Promise.all([
     chrome.storage.local.get(['token', 'port', 'allowlist']),
     chrome.tabs.query({ active: true, currentWindow: true }),
     chrome.runtime.sendMessage({ action: 'status' }).catch(e => ({ ok: false, error: e.message })),
+    chrome.commands?.getAll?.().catch(() => []) ?? Promise.resolve([]),
   ]);
+  const toggleCmd = commands.find(c => c.name === 'toggle-handoff');
+  if (toggleCmd?.shortcut) {
+    handoffKbd.textContent = toggleCmd.shortcut;
+    handoffKbd.hidden = false;
+  }
   activeTab = tab ?? null;
   tokenInput.value = saved.token ?? '';
   portInput.value = saved.port ?? 9334;
