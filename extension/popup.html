@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>T3 Brave Bridge</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --surface: #f5f6f8;
+      --surface-hover: #eceef2;
+      --border: #e4e6eb;
+      --text: #111318;
+      --muted: #656d76;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-text: #ffffff;
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.12);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.14);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.10);
+      --radius: 10px;
+      --radius-sm: 7px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #131417;
+        --surface: #1c1e24;
+        --surface-hover: #252830;
+        --border: #2b2f38;
+        --text: #f3f4f6;
+        --muted: #8b949e;
+        --accent: #3b82f6;
+        --accent-hover: #2563eb;
+        --accent-text: #ffffff;
+        --success: #34d399;
+        --success-bg: rgba(52, 211, 153, 0.14);
+        --warning: #fbbf24;
+        --warning-bg: rgba(251, 191, 36, 0.14);
+        --danger: #f87171;
+        --danger-bg: rgba(248, 113, 113, 0.12);
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 320px;
+      font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .brand-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #3b82f6, #10b981);
+      color: #fff;
+      font-weight: 700;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .pill.connected {
+      background: var(--success-bg);
+      color: var(--success);
+      border-color: transparent;
+    }
+
+    .pill.reconnecting {
+      background: var(--warning-bg);
+      color: var(--warning);
+      border-color: transparent;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 120ms ease, color 120ms ease;
+    }
+
+    .icon-btn:hover,
+    .icon-btn[aria-expanded="true"] {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    /* Banner */
+    .banner {
+      display: none;
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      line-height: 1.35;
+      background: var(--danger-bg);
+      color: var(--danger);
+      word-break: break-word;
+    }
+
+    .banner.info {
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .banner.visible { display: block; }
+
+    /* Sections */
+    .section { margin-bottom: 14px; }
+    .section:last-of-type { margin-bottom: 0; }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 7px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+
+    .text-btn {
+      background: none;
+      border: none;
+      padding: 2px 6px;
+      border-radius: 5px;
+      font: 500 11.5px/1.2 inherit;
+      color: var(--danger);
+      cursor: pointer;
+      transition: background 120ms ease;
+    }
+
+    .text-btn:hover { background: var(--danger-bg); }
+    .text-btn.hidden { display: none; }
+
+    /* Active tabs */
+    .tabs-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 170px;
+      overflow-y: auto;
+    }
+
+    .tab-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 9px;
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      transition: background 120ms ease;
+    }
+
+    .tab-item:hover { background: var(--surface-hover); }
+
+    .tab-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      flex-shrink: 0;
+    }
+
+    .tab-meta {
+      flex: 1;
+      min-width: 0;
+      cursor: pointer;
+    }
+
+    .tab-title {
+      font-size: 12.5px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tab-url {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .unshare-btn {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 120ms ease, color 120ms ease;
+    }
+
+    .unshare-btn:hover {
+      background: var(--danger-bg);
+      color: var(--danger);
+    }
+
+    .empty-state {
+      padding: 10px 11px;
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    /* Allowed domains chips */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font: 500 11.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--text);
+    }
+
+    .chip-remove {
+      border: none;
+      background: none;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 1px;
+    }
+
+    .chip-remove:hover { color: var(--danger); }
+
+    .add-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .add-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 7px 9px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      outline: none;
+    }
+
+    .add-row input:focus { border-color: var(--accent); }
+
+    .btn {
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      padding: 7px 12px;
+      font: 500 12px/1.2 inherit;
+      cursor: pointer;
+      transition: background 120ms ease;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--accent-text);
+    }
+
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .btn-secondary:hover { background: var(--surface-hover); }
+
+    /* Compact one-click handoff bar */
+    .handoff-btn {
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font: 500 12.5px/1.2 inherit;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+    }
+
+    .handoff-btn:hover:not(:disabled) {
+      background: var(--surface-hover);
+      border-color: var(--accent);
+    }
+
+    .handoff-btn.active {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border-color: transparent;
+    }
+
+    .handoff-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .handoff-label {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kbd {
+      flex-shrink: 0;
+      font: 500 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--muted);
+      padding: 2px 5px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    .handoff-btn.active .kbd {
+      color: var(--danger);
+      border-color: currentColor;
+      background: transparent;
+      opacity: 0.75;
+    }
+
+    /* Collapsible Bridge Settings drawer (pairing token & port only) */
+    .settings-drawer {
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .settings-drawer.open { display: block; }
+
+    .field { margin-bottom: 9px; }
+
+    .field label {
+      display: block;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 7px 9px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      outline: none;
+    }
+
+    .field input:focus { border-color: var(--accent); }
+
+    .settings-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    .settings-row .field {
+      flex: 1;
+      margin-bottom: 0;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="brand">
+      <div class="brand-icon">T3</div>
+      <div class="brand-title">Brave Bridge</div>
+    </div>
+    <div class="header-actions">
+      <span id="status-pill" class="pill"><span class="dot"></span><span id="status-text">Connecting</span></span>
+      <button id="settings-toggle" class="icon-btn" type="button" title="Bridge connection settings" aria-label="Bridge connection settings" aria-expanded="false">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" role="alert"></div>
+
+  <button id="handoff-btn" class="handoff-btn" type="button">
+    <span id="handoff-label" class="handoff-label">Hand off current tab</span>
+    <span class="kbd">⌥⇧T</span>
+  </button>
+
+  <section class="section">
+    <div class="section-head">
+      <span id="tabs-heading" class="section-title">Active tabs</span>
+      <button id="disconnect" class="text-btn hidden" type="button">Disconnect all</button>
+    </div>
+    <ul id="tabs" class="tabs-list"></ul>
+    <div id="empty-state" class="empty-state">Standing by — agents open allowed sites automatically.</div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <span class="section-title">Allowed sites</span>
+    </div>
+    <div id="chips" class="chips"></div>
+    <form id="add-form" class="add-row">
+      <input id="domain-input" type="text" spellcheck="false" autocomplete="off" placeholder="Add domain (e.g. *.example.com)">
+      <button class="btn btn-primary" type="submit">Add</button>
+    </form>
+  </section>
+
+  <section id="settings-drawer" class="settings-drawer">
+    <div class="field">
+      <label for="token">Pairing token</label>
+      <input id="token" type="password" autocomplete="off" placeholder="Paste token from ~/.t3/brave-bridge/token">
+    </div>
+    <div class="settings-row">
+      <div class="field">
+        <label for="port">Local port</label>
+        <input id="port" type="number" value="9334" min="1" max="65535">
+      </div>
+      <button id="save-settings" class="btn btn-secondary" type="button">Save</button>
+    </div>
+  </section>
+
+  <script src="popup.js"></script>
+</body>
+</html>

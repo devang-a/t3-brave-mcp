@@ -1,0 +1,22 @@
+{
+  "name": "t3-brave-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node cli.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:brave": "node test-brave.mjs",
+    "mcp": "node mcp.mjs",
+    "backend": "node backend.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@playwright/mcp": "0.0.84",
+    "playwright-core": "1.65.0-alpha-2026-10-30",
+    "ws": "8.22.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

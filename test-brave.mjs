@@ -1,0 +1,116 @@
+// Run explicitly: node test-brave.mjs. Uses a disposable Brave profile only.
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { createBridge } from './bridge.mjs';
+import { chromium } from 'playwright-core';
+const token = 'runtime-test-'.repeat(6);
+const bridge = await createBridge({ token, port: 0 });
+const stateDirectory = await mkdtemp(join(tmpdir(), 't3-brave-mcp-state-'));
+const profile = await mkdtemp(join(tmpdir(), 't3-brave-test-'));
+const server = http.createServer((req, res) => { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><title>Brave bridge test</title><h1>Shared test page</h1><input aria-label="Name"><button onclick="document.querySelector(\'h1\').textContent=document.querySelector(\'input\').value">Apply</button>'); });
+await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+let original, attached, mcpClient;
+try {
+  const extension = resolve('extension');
+  original = await chromium.launchPersistentContext(profile, {
+    executablePath: process.env.BRAVE_EXECUTABLE ?? '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+    headless: false,
+    args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, '--no-first-run', '--no-default-browser-check'],
+  });
+  const worker = original.serviceWorkers()[0] ?? await original.waitForEvent('serviceworker', { timeout: 20000 });
+  const extensionId = new URL(worker.url()).host;
+  const testPage = original.pages()[0] ?? await original.newPage();
+  await testPage.goto(`http://127.0.0.1:${server.address().port}`);
+  const popup = await original.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+  await popup.evaluate(async ({ token, port }) => { await chrome.storage.local.set({ token, port }); }, { token, port: bridge.port });
+  await testPage.bringToFront();
+  const result = await popup.evaluate(() => chrome.runtime.sendMessage({ action: 'share' }));
+  assert.equal(result.ok, true, result.error);
+  const response = await fetch(`http://127.0.0.1:${bridge.port}/json/list?token=${token}`);
+  const targets = await response.json();
+  assert.equal(targets.length, 1);
+  attached = await chromium.connectOverCDP(targets[0].webSocketDebuggerUrl, { timeout: 20000 });
+  const page = attached.contexts()[0].pages()[0];
+  const second = await chromium.connectOverCDP(targets[0].webSocketDebuggerUrl, {timeout:10000});
+  const secondPage = second.contexts()[0].pages()[0];
+  assert.equal(await secondPage.title(), 'Brave bridge test');
+  assert.equal(await page.locator('h1').innerText(), 'Shared test page');
+  assert.equal(await secondPage.locator('h1').innerText(), 'Shared test page');
+  const concurrent = await Promise.all([page.evaluate(() => document.title), secondPage.evaluate(() => document.title)]);
+  assert.deepEqual(concurrent, ['Brave bridge test', 'Brave bridge test']);
+  await secondPage.getByRole('textbox', { name: 'Name' }).fill('Shared change');
+  assert.equal(await page.getByRole('textbox', { name: 'Name' }).inputValue(), 'Shared change');
+  await page.goto(`http://127.0.0.1:${server.address().port}/other`);
+  assert.equal(await secondPage.locator('h1').innerText(), 'Shared test page');
+  assert.ok((await Promise.all([page.screenshot(), secondPage.screenshot()])).every(b => b.length > 1000));
+  await second.close();
+  assert.equal(await page.title(), 'Brave bridge test');
+  console.log('PASS: two simultaneous Brave clients, shared input, navigation, concurrent screenshots, and independent disconnect.');
+
+  assert.equal(await page.title(), 'Brave bridge test');
+  assert.equal(await page.locator('h1').innerText(), 'Shared test page');
+  await page.getByRole('textbox', { name: 'Name' }).fill('Bridge input verified');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  assert.equal(await page.locator('h1').innerText(), 'Bridge input verified');
+  const screenshot = await page.screenshot(); assert.ok(screenshot.length > 1000);
+  const cdp = await page.context().newCDPSession(page);
+  const resultCDP = await cdp.send('Runtime.evaluate', { expression: 'document.title', returnByValue: true });
+  assert.equal(resultCDP.result.value, 'Brave bridge test'); await cdp.detach();
+  await attached.close(); attached = undefined;
+  await writeFile(join(stateDirectory, 'config.json'), JSON.stringify({ endpoint: `http://127.0.0.1:${bridge.port}`, token }), { mode: 0o600 });
+  const originalTabCount = original.pages().length;
+  const transport = new StdioClientTransport({ command: process.execPath, args: [resolve('mcp.mjs')], env: { ...process.env, T3_BRAVE_STATE_DIR: stateDirectory }, stderr: 'pipe' });
+  let mcpErrors = ''; transport.stderr?.on('data', chunk => { mcpErrors += chunk; });
+  mcpClient = new Client({ name: 'real-brave-smoke', version: '1' });
+  await mcpClient.connect(transport);
+  const call = async (name, args = {}) => {
+    const result = await mcpClient.callTool({ name, arguments: args });
+    assert.notEqual(result.isError, true, JSON.stringify(result.content));
+    return result;
+  };
+  await call('browser_backend', { backend: 'brave', targetId: targets[0].id });
+  const secondTransport = new StdioClientTransport({ command: process.execPath, args: [resolve('mcp.mjs')], env: { ...process.env, T3_BRAVE_STATE_DIR: stateDirectory }, stderr: 'pipe' });
+  const secondClient = new Client({ name: 'second-agent', version: '1' });
+  await secondClient.connect(secondTransport);
+  const [firstSnapshot, secondSnapshot] = await Promise.all([call('browser_snapshot'), secondClient.callTool({ name: 'browser_snapshot', arguments: {} })]);
+  assert.notEqual(secondSnapshot.isError, true, JSON.stringify(secondSnapshot.content));
+  assert.match(JSON.stringify(secondSnapshot.content), /Bridge input verified/);
+  await secondClient.close();
+  const snapshot = firstSnapshot;
+  const snapshotText = snapshot.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+  const textbox = /textbox "Name"[^\n]*\[ref=([^\]]+)\]/.exec(snapshotText);
+  const button = /button "Apply"[^\n]*\[ref=([^\]]+)\]/.exec(snapshotText);
+  assert.ok(textbox, snapshotText); assert.ok(button, snapshotText);
+  await call('browser_type', { element: 'Name', target: textbox[1], text: 'MCP input verified' });
+  await call('browser_click', { element: 'Apply', target: button[1] });
+  assert.equal(await testPage.locator('h1').innerText(), 'MCP input verified');
+  const evaluated = await call('browser_evaluate', { function: '() => document.title' });
+  assert.match(JSON.stringify(evaluated.content), /Brave bridge test/);
+  const captured = await call('browser_take_screenshot', { type: 'png', scale: 'css' });
+  assert.ok(captured.content.some(c => c.type === 'image'), 'MCP screenshot did not return an image');
+  await call('browser_backend', { backend: 'preview' });
+  const blocked = await mcpClient.callTool({ name: 'browser_snapshot', arguments: {} });
+  assert.equal(blocked.isError, true); assert.match(JSON.stringify(blocked.content), /preview_\*/);
+  assert.equal(await testPage.title(), 'Brave bridge test', 'Switch must not close the personal tab');
+  assert.equal(original.pages().length, originalTabCount, 'MCP must not create extra tabs');
+  await mcpClient.close(); mcpClient = undefined;
+  assert.equal(await testPage.title(), 'Brave bridge test', 'Closing companion must not close the shared tab');
+  assert.equal(original.pages().length, originalTabCount, 'Closing companion must preserve tabs');
+  assert.equal(mcpErrors, '');
+  console.log('PASS: stdio MCP tool listing, Brave selection, snapshot, type/click, evaluate, screenshot, switch to preview, and preserved tab.');
+  console.log('PASS: isolated Brave extension attachment, connectOverCDP, evaluate, DOM/input/click, screenshot, and extra CDP session.');
+} finally {
+  await mcpClient?.close().catch(() => {});
+  await attached?.close().catch(() => {});
+  await original?.close().catch(() => {});
+  await bridge.close(); await new Promise(resolve => server.close(resolve));
+  await rm(stateDirectory, { recursive: true, force: true });
+  await rm(profile, { recursive: true, force: true });
+}

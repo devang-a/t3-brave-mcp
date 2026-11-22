@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "T3 Brave Bridge",
+  "version": "0.3.1",
+  "description": "Hands-free allowlisted browser automation plus one-click tab handoff for local MCP agents.",
+  "permissions": ["debugger", "activeTab", "tabs", "storage", "alarms"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "background": { "service_worker": "worker.js" },
+  "action": { "default_popup": "popup.html", "default_title": "T3 Brave Bridge" },
+  "commands": {
+    "toggle-handoff": {
+      "suggested_key": {
+        "default": "Alt+Shift+T",
+        "mac": "Alt+Shift+T"
+      },
+      "description": "Hand off or release the current tab to T3"
+    }
+  },
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'self'; connect-src ws://127.0.0.1:* http://127.0.0.1:*" }
+}
