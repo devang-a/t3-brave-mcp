@@ -10,8 +10,8 @@
   "commands": {
     "toggle-handoff": {
       "suggested_key": {
-        "default": "Alt+Shift+T",
-        "mac": "Command+T"
+        "default": "Alt+T",
+        "mac": "MacCtrl+T"
       },
       "description": "Hand off or release the current tab to T3"
     }
