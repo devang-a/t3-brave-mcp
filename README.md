@@ -30,7 +30,7 @@ MCP Client (Claude / Codex / Antigravity)
 Requires **Node.js 22+**.
 
 ```sh
-git clone https://github.com/Thenewbiehacker/t3-brave-mcp.git
+git clone https://github.com/devang-a/t3-brave-mcp.git
 cd t3-brave-mcp
 npm ci
 ```
